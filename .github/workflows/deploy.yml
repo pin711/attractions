@@ -1,53 +1,21 @@
-name: Build and Deploy to GitHub Pages
 
-on:
-  push:
-    branches: ["main"]
-  workflow_dispatch:
+import { defineConfig, loadEnv } from 'vite'
+import react from '@vitejs/plugin-react'
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          
-      - name: Install Dependencies
-        run: npm install
-
-      - name: Build
-        env:
-          # 將 GitHub Secret 注入到環境變數，Vite 會讀取它
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: npm run build
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          # Vite 預設 build 出來的資料夾是 dist
-          path: './dist'
-
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+// https://vitejs.dev/config/
+export default defineConfig(({ mode }) => {
+  // 載入環境變數
+  const env = loadEnv(mode, '.', '');
+  
+  return {
+    plugins: [react()],
+    // 設定 Base URL，讓 GitHub Pages (https://user.github.io/repo/) 能正確讀取檔案
+    // 使用 './' 代表相對路徑，這是最安全的設定
+    base: './',
+    define: {
+      // 在建置時，將程式碼中的 process.env.API_KEY 替換為實際的環境變數值
+      // 增加 || '' 以防止 undefined 導致語法錯誤
+      'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY || process.env.API_KEY || '')
+    }
+  }
+})
