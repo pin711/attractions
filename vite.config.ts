@@ -1,23 +1,19 @@
-import path from 'path';
-import { defineConfig, loadEnv } from 'vite';
-import react from '@vitejs/plugin-react';
+import { defineConfig, loadEnv } from 'vite'
+import react from '@vitejs/plugin-react'
 
+// https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
-    const env = loadEnv(mode, '.', '');
-    return {
-      server: {
-        port: 3000,
-        host: '0.0.0.0',
-      },
-      plugins: [react()],
-      define: {
-        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY)
-      },
-      resolve: {
-        alias: {
-          '@': path.resolve(__dirname, '.'),
-        }
-      }
-    };
-});
+  // 載入環境變數
+  const env = loadEnv(mode, '.', '');
+  
+  return {
+    plugins: [react()],
+    // 設定 Base URL，讓 GitHub Pages (https://user.github.io/repo/) 能正確讀取檔案
+    // 使用 './' 代表相對路徑，這是最安全的設定
+    base: './',
+    define: {
+      // 在建置時，將程式碼中的 process.env.API_KEY 替換為實際的環境變數值
+      'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY || process.env.API_KEY)
+    }
+  }
+})
