@@ -1,3 +1,4 @@
+
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 
@@ -13,7 +14,8 @@ export default defineConfig(({ mode }) => {
     base: './',
     define: {
       // 在建置時，將程式碼中的 process.env.API_KEY 替換為實際的環境變數值
-      'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY || process.env.API_KEY)
+      // 增加 || '' 以防止 undefined 導致語法錯誤
+      'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY || process.env.API_KEY || '')
     }
   }
 })

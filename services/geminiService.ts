@@ -4,11 +4,13 @@ import { Coordinates, GetAttractionsResponse, GoogleMapsGroundingChunk, Attracti
 
 const API_KEY = process.env.API_KEY;
 
-if (!API_KEY) {
-  throw new Error("API_KEY environment variable is not set");
+// 增加更明確的檢查
+if (!API_KEY || API_KEY.length < 10) {
+  console.error("API Key is missing or invalid length:", API_KEY);
+  // 這裡不 throw，允許 UI 顯示更友善的錯誤，但在呼叫時會失敗
 }
 
-const ai = new GoogleGenAI({ apiKey: API_KEY });
+const ai = new GoogleGenAI({ apiKey: API_KEY || 'DUMMY_KEY' });
 
 const getCategoryLabel = (category: CategoryOption): string => {
   const map: Record<CategoryOption, string> = {
@@ -32,13 +34,16 @@ const getDistanceLabel = (distance: DistanceOption): string => {
 };
 
 export const getAttractions = async (coords: Coordinates, category: CategoryOption, distance: DistanceOption): Promise<GetAttractionsResponse> => {
+  if (!API_KEY) {
+    throw new Error("未設定 API Key。請確認 GitHub Secrets 設定或本地 .env 檔案。");
+  }
+
   try {
     const categoryText = getCategoryLabel(category);
     const distanceText = getDistanceLabel(distance);
 
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      // 更新提示以包含類別和距離篩選
       contents: `請根據我目前的位置 (緯度:${coords.latitude}, 經度:${coords.longitude})，推薦5個「${distanceText}」且屬於「${categoryText}」類型的熱門旅遊景點。請用繁體中文回答。每個景點需包含：景點名稱、簡短描述、詳細地址以及經緯度。請嚴格遵守以下數字列表格式，不要添加任何額外文字或說明：'1. 景點名稱 - 簡短描述 (地址: 景點詳細地址, 緯度: 25.0330, 經度: 121.5654)'。`,
       config: {
         tools: [{googleMaps: {}}],
@@ -61,13 +66,29 @@ export const getAttractions = async (coords: Coordinates, category: CategoryOpti
       text: response.text,
       groundingChunks: groundingChunks
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error calling Gemini API:", error);
-    throw new Error("無法從 AI 獲取推薦。請稍後再試。");
+    
+    // 解析並回傳具體錯誤訊息
+    let errorMessage = error.message || error.toString();
+    
+    if (errorMessage.includes("API_KEY")) {
+      errorMessage = "API Key 無效或未設定。";
+    } else if (errorMessage.includes("403")) {
+      errorMessage = "存取被拒 (403)。請檢查 API Key 是否正確，或是否有權限使用此模型 (gemini-2.5-flash)。";
+    } else if (errorMessage.includes("429")) {
+      errorMessage = "請求過多 (429) 或額度已滿。請稍後再試。";
+    } else if (errorMessage.includes("not found") || errorMessage.includes("404")) {
+      errorMessage = "找不到模型 (404)。該模型可能尚未在您的區域開放，或名稱有誤。";
+    }
+
+    throw new Error(`API 錯誤: ${errorMessage}`);
   }
 };
 
 export const getAttractionDetails = async (attractionName: string): Promise<AttractionDetailContent> => {
+  if (!API_KEY) throw new Error("API Key 未設定");
+
   let geminiResponse: GenerateContentResponse | undefined;
   let rawJsonText: string | undefined;
 
@@ -112,11 +133,8 @@ export const getAttractionDetails = async (attractionName: string): Promise<Attr
     rawJsonText = geminiResponse.text.trim();
     const parsedDetails: AttractionDetailContent = JSON.parse(rawJsonText);
     return parsedDetails;
-  } catch (error) {
-    console.error("Error calling Gemini API for details or parsing response:", error);
-    if (error instanceof SyntaxError) {
-        throw new Error(`AI 回應的格式不正確，無法解析 JSON。原始回應: ${error.message}. 原始回應文本: ${rawJsonText || (geminiResponse ? geminiResponse.text : 'N/A')}`);
-    }
-    throw new Error("無法從 AI 獲取景點詳細資訊。請稍後再試。");
+  } catch (error: any) {
+    console.error("Error calling Gemini API for details:", error);
+    throw new Error(`無法獲取詳細資訊: ${error.message}`);
   }
 };
