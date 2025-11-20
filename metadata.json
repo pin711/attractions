@@ -1,0 +1,7 @@
+{
+  "name": "AI 景點推薦",
+  "description": "一個使用 AI 根據您目前的位置來推薦附近旅遊景點的網頁應用程式。",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
